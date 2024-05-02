@@ -301,6 +301,33 @@ TASK_DECL_2(ZDD, zdd_diff, ZDD, ZDD);
 #define zdd_diff(a, b) RUN(zdd_diff, a, b)
 
 /**
+ * Compute subsumed DIFF of <a> and <b>.
+ *
+ * Removes from <b> all sets that are subsumed by (supersets of) some set in <a>.
+ */
+TASK_DECL_2(ZDD, zdd_subsumed_diff, ZDD, ZDD);
+#define zdd_subsumed_diff(a, b) RUN(zdd_subsumed_diff, a, b)
+
+/**
+ * Remove subsumed sets from a ZDD.
+ *
+ * Removes all sets that are subsumed by (supersets of) some other set in the ZDD.
+ */
+TASK_DECL_1(ZDD, zdd_no_subsumed, ZDD);
+#define zdd_no_subsumed(dd) RUN(zdd_no_subsumed, dd)
+
+/**
+ * Compute subsumption-free OR of <a> and <b>.
+ *
+ * Computes the set union of <a> and <b> while removing all sets that are subsumed by (supersets of) some other set in
+ * the result.
+ * Note that this operation is asymmetrical and assumes that <a> is already subsumption-free.
+ * If that's not the case, run zdd_no_subsumed(a) first.
+ */
+TASK_DECL_2(ZDD, zdd_or_no_subsumed, ZDD, ZDD);
+#define zdd_or_no_subsumed(a, b) RUN(zdd_or_no_subsumed, a, b)
+
+/**
  * Compute logical XOR of <a> and <b>.
  */
 // TASK_DECL_2(ZDD, zdd_xor, ZDD, ZDD);

@@ -1560,6 +1560,230 @@ TASK_IMPL_2(ZDD, zdd_diff, ZDD, a, ZDD, b)
 }
 
 /**
+ * Algorithms for removing subsumed sets (supersets)
+ *
+ * Based on P. Chatalic and L. Simon, "Multi-resolution on compressed sets of clauses"
+ * https://ieeexplore.ieee.org/document/889839
+ */
+
+/**
+ * Compute subsumed DIFF of <a> and <b>.
+ *
+ * Removes from <b> all sets that are subsumed by (supersets of) some set in <a>.
+ */
+TASK_IMPL_2(ZDD, zdd_subsumed_diff, ZDD, a, ZDD, b)
+{
+    // base cases
+    if (a == zdd_false) return zdd_false;
+    if (b == zdd_true) return zdd_false;
+    if (a == zdd_true) return zdd_true;
+    if (b == zdd_false) return a;
+
+    // trivial case
+    if (a == b) return zdd_false;
+
+    // maybe run garbage collection
+    sylvan_gc_test();
+
+    // count operation
+    sylvan_stats_count(ZDD_SUBSUMED_DIFF);
+
+    // check the cache
+    ZDD result;
+    if (cache_get3(CACHE_ZDD_SUBSUMED_DIFF, a, b, 0, &result)) {
+        sylvan_stats_count(ZDD_SUBSUMED_DIFF_CACHED);
+        return result;
+    }
+
+    // get vars
+    const zddnode_t a_node = ZDD_GETNODE(a);
+    const uint32_t a_var = zddnode_getvariable(a_node);
+    const zddnode_t b_node = ZDD_GETNODE(b);
+    const uint32_t b_var = zddnode_getvariable(b_node);
+
+    // recursive cases
+    if (a_var > b_var) {
+        const ZDD b0 = zddnode_low(b, b_node);
+
+        result = CALL(zdd_subsumed_diff, a, b0);
+    } else if (a_var < b_var) {
+        const ZDD a0 = zddnode_low(a, a_node);
+        const ZDD a1 = zddnode_high(a, a_node);
+
+        zdd_refs_spawn(SPAWN(zdd_subsumed_diff, a0, b));
+        const ZDD high = CALL(zdd_subsumed_diff, a1, b);
+        zdd_refs_push(high);
+        const ZDD low = zdd_refs_sync(SYNC(zdd_subsumed_diff));
+        zdd_refs_pop(1);
+
+        result = zdd_makenode(a_var, low, high);
+    } else {
+        assert(a_var == b_var);
+        const ZDD a0 = zddnode_low(a, a_node);
+        const ZDD a1 = zddnode_high(a, a_node);
+        const ZDD b0 = zddnode_low(b, b_node);
+        const ZDD b1 = zddnode_high(b, b_node);
+
+        zdd_refs_spawn(SPAWN(zdd_subsumed_diff, a0, b0));
+        const ZDD tmp = CALL(zdd_subsumed_diff, a1, b1);
+        zdd_refs_push(tmp);
+        const ZDD high = CALL(zdd_subsumed_diff, tmp, b0);
+        zdd_refs_pop(1);
+        zdd_refs_push(high);
+        const ZDD low = zdd_refs_sync(SYNC(zdd_subsumed_diff));
+        zdd_refs_pop(1);
+
+        result = zdd_makenode(a_var, low, high);
+    }
+
+    // Cache the result
+    if (cache_put3(CACHE_ZDD_SUBSUMED_DIFF, a, b, 0, result)) {
+        sylvan_stats_count(ZDD_SUBSUMED_DIFF_CACHEDPUT);
+    }
+
+    return result;
+}
+
+/**
+ * Remove subsumed sets from a ZDD.
+ *
+ * Removes all sets that are subsumed by (supersets of) some other set in the ZDD.
+ */
+TASK_IMPL_1(ZDD, zdd_no_subsumed, ZDD, dd)
+{
+    // base cases
+    if (dd == zdd_false) return zdd_false;
+    if (dd == zdd_true) return zdd_true;
+
+    // maybe run garbage collection
+    sylvan_gc_test();
+
+    // count operation
+    sylvan_stats_count(ZDD_NO_SUBSUMED);
+
+    // check the cache
+    ZDD result;
+    if (cache_get3(CACHE_ZDD_NO_SUBSUMED, dd, 0, 0, &result)) {
+        sylvan_stats_count(ZDD_NO_SUBSUMED_CACHED);
+        return result;
+    }
+
+    // get vars
+    const zddnode_t node = ZDD_GETNODE(dd);
+    const uint32_t var = zddnode_getvariable(node);
+    const ZDD dd0 = zddnode_low(dd, node);
+    const ZDD dd1 = zddnode_high(dd, node);
+
+    // recursive cases
+    if (dd0 == dd1) {
+        result = CALL(zdd_no_subsumed, dd0);
+    } else {
+        zdd_refs_spawn(SPAWN(zdd_no_subsumed, dd0));
+        const ZDD tmp = CALL(zdd_no_subsumed, dd1);
+        zdd_refs_push(tmp);
+        const ZDD low = zdd_refs_sync(SYNC(zdd_no_subsumed));
+        zdd_refs_push(low);
+        const ZDD high = CALL(zdd_subsumed_diff, tmp, low);
+        zdd_refs_pop(2);
+
+        result = zdd_makenode(var, low, high);
+    }
+
+    // Cache the result
+    if (cache_put3(CACHE_ZDD_NO_SUBSUMED, dd, 0, 0, result)) {
+        sylvan_stats_count(ZDD_NO_SUBSUMED_CACHEDPUT);
+    }
+
+    return result;
+}
+
+/**
+ * Compute subsumption-free OR of <a> and <b>.
+ *
+ * Computes the set union of <a> and <b> while removing all sets that are subsumed by (supersets of) some other set in
+ * the result.
+ * Note that this operation is asymmetrical and assumes that <a> is already subsumption-free.
+ * If that's not the case, run zdd_no_subsumed(a) first.
+ */
+TASK_IMPL_2(ZDD, zdd_or_no_subsumed, ZDD, a, ZDD, b)
+{
+    // base cases
+    if (a == zdd_true) return zdd_true;
+    if (b == zdd_true) return zdd_true;
+    if (b == zdd_false) return a; // assumes <a> is already subsumption-free
+
+    // non-trivial non-recursive case
+    if (a == zdd_false) return CALL(zdd_no_subsumed, b); // <b> doesn't have to be subsumption-free
+
+    // maybe run garbage collection
+    sylvan_gc_test();
+
+    // count operation
+    sylvan_stats_count(ZDD_OR_NO_SUBSUMED);
+
+    // check the cache
+    ZDD result;
+    if (cache_get3(CACHE_ZDD_OR_NO_SUBSUMED, a, b, 0, &result)) {
+        sylvan_stats_count(ZDD_OR_NO_SUBSUMED_CACHED);
+        return result;
+    }
+
+    // get vars
+    const zddnode_t a_node = ZDD_GETNODE(a);
+    const uint32_t a_var = zddnode_getvariable(a_node);
+    const zddnode_t b_node = ZDD_GETNODE(b);
+    const uint32_t b_var = zddnode_getvariable(b_node);
+
+    // recursive cases
+    if (a_var < b_var) {
+        const ZDD a0 = zddnode_low(a, a_node);
+        const ZDD a1 = zddnode_high(a, a_node);
+
+        const ZDD low = CALL(zdd_or_no_subsumed, a0, b);
+        zdd_refs_push(low);
+        const ZDD high = CALL(zdd_subsumed_diff, a1, low);
+        zdd_refs_pop(1);
+
+        result = zdd_makenode(a_var, low, high);
+    } else if (a_var > b_var) {
+        const ZDD b0 = zddnode_low(b, b_node);
+        const ZDD b1 = zddnode_high(b, b_node);
+
+        zdd_refs_spawn(SPAWN(zdd_no_subsumed, b1));
+        const ZDD low = CALL(zdd_or_no_subsumed, a, b0);
+        zdd_refs_push(low);
+        const ZDD tmp = zdd_refs_sync(SYNC(zdd_no_subsumed));
+        zdd_refs_push(tmp);
+        const ZDD high = CALL(zdd_subsumed_diff, tmp, low);
+        zdd_refs_pop(2);
+
+        result = zdd_makenode(b_var, low, high);
+    } else {
+        assert(a_var == b_var);
+        const ZDD a0 = zddnode_low(a, a_node);
+        const ZDD a1 = zddnode_high(a, a_node);
+        const ZDD b0 = zddnode_low(b, b_node);
+        const ZDD b1 = zddnode_high(b, b_node);
+
+        zdd_refs_spawn(SPAWN(zdd_or_no_subsumed, a1, b1));
+        const ZDD low = CALL(zdd_or_no_subsumed, a0, b0);
+        zdd_refs_push(low);
+        const ZDD tmp = zdd_refs_sync(SYNC(zdd_or_no_subsumed));
+        zdd_refs_push(tmp);
+        const ZDD high = CALL(zdd_subsumed_diff, tmp, low);
+
+        result = zdd_makenode(a_var, low, high);
+    }
+
+    // Cache the result
+    if (cache_put3(CACHE_ZDD_OR_NO_SUBSUMED, a, b, 0, result)) {
+        sylvan_stats_count(ZDD_OR_NO_SUBSUMED_CACHEDPUT);
+    }
+
+    return result;
+}
+
+/**
  * Compute existential quantification, but stay in same domain
  */
 TASK_IMPL_2(ZDD, zdd_exists, ZDD, dd, ZDD, vars)
