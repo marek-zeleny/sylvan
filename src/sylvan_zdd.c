@@ -1560,6 +1560,92 @@ TASK_IMPL_2(ZDD, zdd_diff, ZDD, a, ZDD, b)
 }
 
 /**
+ * Compute product of <a> and <b>. (set distribution)
+ */
+TASK_IMPL_2(ZDD, zdd_product, ZDD, a, ZDD, b)
+{
+    // resolve ground cases
+    if (a == zdd_false) return zdd_false;
+    if (a == zdd_true) return b;
+    if (b == zdd_false) return zdd_false;
+    if (b == zdd_true) return a;
+
+    // maybe run garbage collection
+    sylvan_gc_test();
+
+    // count operation
+    sylvan_stats_count(ZDD_PRODUCT);
+
+    // get vars
+    zddnode_t a_node = ZDD_GETNODE(a);
+    uint32_t a_var = zddnode_getvariable(a_node);
+    zddnode_t b_node = ZDD_GETNODE(b);
+    uint32_t b_var = zddnode_getvariable(b_node);
+
+    // break symmetry
+    if (a_var > b_var) {
+        ZDD tmp = a;
+        zddnode_t tmp_node = a_node;
+        uint32_t tmp_var = a_var;
+        a = b;
+        a_node = b_node;
+        a_var = b_var;
+        b = tmp;
+        b_node = tmp_node;
+        b_var = tmp_var;
+    }
+
+    // check the cache
+    ZDD result;
+    if (cache_get3(CACHE_ZDD_PRODUCT, a, b, 0, &result)) {
+        sylvan_stats_count(ZDD_PRODUCT_CACHED);
+        return result;
+    }
+
+    // recursive case
+    ZDD a0 = zddnode_low(a, a_node);
+    ZDD a1 = zddnode_high(a, a_node);
+    ZDD b0;
+    ZDD b1;
+    if (b_var == a_var) {
+        b0 = zddnode_low(b, b_node);
+        b1 = zddnode_high(b, b_node);
+    } else {
+        b0 = b;
+        b1 = zdd_false;
+    }
+
+    zdd_refs_spawn(SPAWN(zdd_product, a0, b0));
+    zdd_refs_spawn(SPAWN(zdd_product, a0, b1));
+    zdd_refs_spawn(SPAWN(zdd_product, a1, b0));
+
+    ZDD a1b1 = CALL(zdd_product, a1, b1);
+    zdd_refs_push(a1b1);
+    ZDD a1b0 = zdd_refs_sync(SYNC(zdd_product));
+    zdd_refs_push(a1b0);
+    ZDD tmp1 = CALL(zdd_or, a1b1, a1b0);
+    zdd_refs_pop(2);
+    zdd_refs_push(tmp1);
+
+    ZDD a0b1 = zdd_refs_sync(SYNC(zdd_product));
+    zdd_refs_push(a0b1);
+    ZDD tmp2 = CALL(zdd_or, tmp1, a0b1);
+    zdd_refs_pop(2);
+    zdd_refs_push(tmp2);
+
+    ZDD a0b0 = zdd_refs_sync(SYNC(zdd_product));
+    zdd_refs_pop(1);
+    result = zdd_makenode(a_var, a0b0, tmp2);
+
+    // Cache the result
+    if (cache_put3(CACHE_ZDD_PRODUCT, a, b, 0, result)) {
+        sylvan_stats_count(ZDD_PRODUCT_CACHEDPUT);
+    }
+
+    return result;
+}
+
+/**
  * Algorithms for removing subsumed sets (supersets)
  *
  * Based on P. Chatalic and L. Simon, "Multi-resolution on compressed sets of clauses"

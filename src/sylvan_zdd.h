@@ -301,6 +301,12 @@ TASK_DECL_2(ZDD, zdd_diff, ZDD, ZDD);
 #define zdd_diff(a, b) RUN(zdd_diff, a, b)
 
 /**
+ * Compute product of <a> and <b>. (set distribution)
+ */
+TASK_DECL_2(ZDD, zdd_product, ZDD, ZDD);
+#define zdd_product(a, b) RUN(zdd_product, a, b)
+
+/**
  * Compute subsumed DIFF of <a> and <b>.
  *
  * Removes from <b> all sets that are subsumed by (supersets of) some set in <a>.
