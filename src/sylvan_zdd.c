@@ -1904,7 +1904,7 @@ TASK_IMPL_1(ZDD, zdd_remove_tautologies, ZDD, dd)
 
     // recursive cases
     zdd_refs_spawn(SPAWN(zdd_remove_tautologies, dd0));
-    ZDD high = CALL(zdd_remove_tautologies, dd);
+    ZDD high = CALL(zdd_remove_tautologies, dd1);
     zdd_refs_push(high);
     ZDD low = zdd_refs_sync(SYNC(zdd_remove_tautologies));
     zdd_refs_pop(1);
