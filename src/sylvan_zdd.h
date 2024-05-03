@@ -334,6 +334,16 @@ TASK_DECL_2(ZDD, zdd_or_no_subsumed, ZDD, ZDD);
 #define zdd_or_no_subsumed(a, b) RUN(zdd_or_no_subsumed, a, b)
 
 /**
+ * Remove tautologies from <dd>.
+ *
+ * Note: This is not a general-purpose ZDD algorithm, it has a specific usecase with specific semantics.
+ * The algorithm assumes that complementary literals are consecutive in the variable order,
+ * i.e. for x > 0: var(x) = 2x, var(-x) = 2x + 1
+ */
+TASK_DECL_1(ZDD, zdd_remove_tautologies, ZDD);
+#define zdd_remove_tautologies(dd) RUN(zdd_remove_tautologies, dd);
+
+/**
  * Compute logical XOR of <a> and <b>.
  */
 // TASK_DECL_2(ZDD, zdd_xor, ZDD, ZDD);

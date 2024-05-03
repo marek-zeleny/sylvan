@@ -1870,6 +1870,65 @@ TASK_IMPL_2(ZDD, zdd_or_no_subsumed, ZDD, a, ZDD, b)
 }
 
 /**
+ * Remove tautologies from <dd>.
+ *
+ * Note: This is not a general-purpose ZDD algorithm, it has a specific usecase with specific semantics.
+ * The algorithm assumes that complementary literals are consecutive in the variable order,
+ * i.e. for x > 0: var(x) = 2x, var(-x) = 2x + 1
+ */
+TASK_IMPL_1(ZDD, zdd_remove_tautologies, ZDD, dd)
+{
+    // base cases
+    if (dd == zdd_false || dd == zdd_true) {
+        return dd;
+    }
+
+    // maybe run garbage collection
+    sylvan_gc_test();
+
+    // count operation
+    sylvan_stats_count(ZDD_REMOVE_TAUTOLOGIES);
+
+    // check the cache
+    ZDD result;
+    if (cache_get3(CACHE_ZDD_REMOVE_TAUTOLOGIES, dd, 0, 0, &result)) {
+        sylvan_stats_count(ZDD_REMOVE_TAUTOLOGIES_CACHED);
+        return result;
+    }
+
+    // get vars
+    const zddnode_t node = ZDD_GETNODE(dd);
+    const uint32_t var = zddnode_getvariable(node);
+    const ZDD dd0 = zddnode_low(dd, node);
+    const ZDD dd1 = zddnode_high(dd, node);
+
+    // recursive cases
+    zdd_refs_spawn(SPAWN(zdd_remove_tautologies, dd0));
+    ZDD high = CALL(zdd_remove_tautologies, dd);
+    zdd_refs_push(high);
+    ZDD low = zdd_refs_sync(SYNC(zdd_remove_tautologies));
+    zdd_refs_pop(1);
+    if (high == zdd_false || high == zdd_true) {
+        // high child doesn't have a variable (is a leaf), do nothing
+        result = zdd_makenode(var, low, high);
+    } else if (var / 2 == zdd_getvar(high) / 2) {
+        // otherwise compare variables in <zdd> and <high>
+        // complements, remove high child of <high>
+        result = zdd_makenode(var, low, zdd_getlow(high));
+    } else {
+        // not complements, do nothing
+        result = zdd_makenode(var, low, high);
+    }
+
+    // cache the result
+    if (cache_put3(CACHE_ZDD_REMOVE_TAUTOLOGIES, dd, 0, 0, result)) {
+        sylvan_stats_count(ZDD_REMOVE_TAUTOLOGIES_CACHEDPUT);
+    }
+
+    return result;
+}
+
+/**
  * Compute existential quantification, but stay in same domain
  */
 TASK_IMPL_2(ZDD, zdd_exists, ZDD, dd, ZDD, vars)
