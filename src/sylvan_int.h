@@ -120,7 +120,7 @@ static const uint64_t CACHE_ZDD_EVAL                = (94LL<<40);
 static const uint64_t CACHE_ZDD_SUBSUMED_DIFF       = (95LL<<40);
 static const uint64_t CACHE_ZDD_NO_SUBSUMED         = (96LL<<40);
 static const uint64_t CACHE_ZDD_OR_NO_SUBSUMED      = (97LL<<40);
-static const uint64_t CACHE_ZDD_PRODUCT             = (97LL<<40);
+static const uint64_t CACHE_ZDD_PRODUCT             = (98LL<<40);
 
 #ifdef __cplusplus
 }
