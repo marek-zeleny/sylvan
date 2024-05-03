@@ -1655,7 +1655,7 @@ TASK_IMPL_2(ZDD, zdd_product, ZDD, a, ZDD, b)
 /**
  * Compute subsumed DIFF of <a> and <b>.
  *
- * Removes from <b> all sets that are subsumed by (supersets of) some set in <a>.
+ * Removes from <a> all sets that are subsumed by (supersets of) some set in <b>.
  */
 TASK_IMPL_2(ZDD, zdd_subsumed_diff, ZDD, a, ZDD, b)
 {
