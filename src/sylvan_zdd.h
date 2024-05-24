@@ -196,6 +196,7 @@ MTBDD zdd_set_to_mtbdd(ZDD set);
 
 /**
  * Create a ZDD representing a combination of given variables, i.e. representing var1 AND var2 AND ...
+ * Assumes that <variables> are sorted from smallest to largest.
  */
 ZDD zdd_combination_from_array(uint32_t *variables, size_t len);
 
