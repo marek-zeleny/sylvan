@@ -195,6 +195,11 @@ ZDD zdd_set_remove(ZDD set, uint32_t var);
 MTBDD zdd_set_to_mtbdd(ZDD set);
 
 /**
+ * Create a ZDD representing a combination of given variables, i.e. representing var1 AND var2 AND ...
+ */
+ZDD zdd_combination_from_array(uint32_t *variables, size_t len);
+
+/**
  * Create a cube of literals of the given domain with the values given in <arr>.
  * Uses the given leaf as leaf.
  * For values, 0 (negative literal), 1 (positive), 2 (both values).
