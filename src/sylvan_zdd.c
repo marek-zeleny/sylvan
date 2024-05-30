@@ -851,9 +851,10 @@ zdd_set_to_mtbdd(ZDD set)
 /**
  * Create a ZDD representing a combination of given variables, i.e. representing var1 AND var2 AND ...
  * Assumes that <variables> are sorted from smallest to largest.
+ *
+ * Must be ceclared as a Lace task, because zdd_makenode() uses zdd_refs_push().
  */
-ZDD
-zdd_combination_from_array(uint32_t *variables, size_t len)
+TASK_IMPL_2(ZDD, zdd_combination_from_array, uint32_t *, variables, size_t, len)
 {
     if (len == 0) {
         return zdd_true;
