@@ -336,8 +336,6 @@ TASK_DECL_1(ZDD, zdd_no_subsumed, ZDD);
  *
  * Computes the set union of <a> and <b> while removing all sets that are subsumed by (supersets of) some other set in
  * the result.
- * Note that this operation is asymmetrical and assumes that <a> is already subsumption-free.
- * If that's not the case, run zdd_no_subsumed(a) first.
  */
 TASK_DECL_2(ZDD, zdd_or_no_subsumed, ZDD, ZDD);
 #define zdd_or_no_subsumed(a, b) RUN(zdd_or_no_subsumed, a, b)

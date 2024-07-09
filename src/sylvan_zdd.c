@@ -1806,18 +1806,16 @@ TASK_IMPL_1(ZDD, zdd_no_subsumed, ZDD, dd)
  *
  * Computes the set union of <a> and <b> while removing all sets that are subsumed by (supersets of) some other set in
  * the result.
- * Note that this operation is asymmetrical and assumes that <a> is already subsumption-free.
- * If that's not the case, run zdd_no_subsumed(a) first.
  */
 TASK_IMPL_2(ZDD, zdd_or_no_subsumed, ZDD, a, ZDD, b)
 {
     // base cases
     if (a == zdd_true) return zdd_true;
     if (b == zdd_true) return zdd_true;
-    if (b == zdd_false) return a; // assumes <a> is already subsumption-free
 
     // non-trivial non-recursive case
-    if (a == zdd_false) return CALL(zdd_no_subsumed, b); // <b> doesn't have to be subsumption-free
+    if (a == zdd_false) return CALL(zdd_no_subsumed, b);
+    if (b == zdd_false) return CALL(zdd_no_subsumed, a);
 
     // maybe run garbage collection
     sylvan_gc_test();
@@ -1843,10 +1841,13 @@ TASK_IMPL_2(ZDD, zdd_or_no_subsumed, ZDD, a, ZDD, b)
         const ZDD a0 = zddnode_low(a, a_node);
         const ZDD a1 = zddnode_high(a, a_node);
 
+        zdd_refs_spawn(SPAWN(zdd_no_subsumed, a1));
         const ZDD low = CALL(zdd_or_no_subsumed, a0, b);
         zdd_refs_push(low);
-        const ZDD high = CALL(zdd_subsumed_diff, a1, low);
-        zdd_refs_pop(1);
+        const ZDD tmp = zdd_refs_sync(SYNC(zdd_no_subsumed));
+        zdd_refs_push(tmp);
+        const ZDD high = CALL(zdd_subsumed_diff, tmp, low);
+        zdd_refs_pop(2);
 
         result = zdd_makenode(a_var, low, high);
     } else if (a_var > b_var) {
