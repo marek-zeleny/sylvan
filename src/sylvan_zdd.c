@@ -1679,7 +1679,7 @@ TASK_IMPL_2(ZDD, zdd_subsumed_diff, ZDD, a, ZDD, b)
 {
     // base cases
     if (a == zdd_false) return zdd_false;
-    if (b == zdd_true) return zdd_false;
+    if (ZDD_HASMARK(b)) return zdd_false;
     if (a == zdd_true) return zdd_true;
     if (b == zdd_false) return a;
 
@@ -1757,7 +1757,7 @@ TASK_IMPL_1(ZDD, zdd_no_subsumed, ZDD, dd)
 {
     // base cases
     if (dd == zdd_false) return zdd_false;
-    if (dd == zdd_true) return zdd_true;
+    if (ZDD_HASMARK(dd)) return zdd_true;
 
     // maybe run garbage collection
     sylvan_gc_test();
@@ -1810,8 +1810,8 @@ TASK_IMPL_1(ZDD, zdd_no_subsumed, ZDD, dd)
 TASK_IMPL_2(ZDD, zdd_or_no_subsumed, ZDD, a, ZDD, b)
 {
     // base cases
-    if (a == zdd_true) return zdd_true;
-    if (b == zdd_true) return zdd_true;
+    if (ZDD_HASMARK(a)) return zdd_true;
+    if (ZDD_HASMARK(b)) return zdd_true;
 
     // non-trivial non-recursive case
     if (a == zdd_false) return CALL(zdd_no_subsumed, b);
